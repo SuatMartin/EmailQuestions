@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/email_service.dart';
-import '../services/email_statistics_service.dart';
 
 class EmailForm extends StatefulWidget {
   @override
@@ -33,10 +32,6 @@ class _EmailFormState extends State<EmailForm> {
         toEmail: toEmail,
         context: context,
       );
-
-      // Update the email statistics
-      await EmailStatisticsService.updateStatistics(_selectedTopic!);
-
       // Show a success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Email sent successfully')),

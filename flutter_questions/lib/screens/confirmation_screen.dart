@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'email_statistics_screen.dart'; // Import the statistics screen
 
 class ConfirmationScreen extends StatelessWidget {
   // URL to navigate
@@ -41,16 +40,6 @@ class ConfirmationScreen extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  // Navigate to the statistics screen
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => EmailStatisticsScreen()),
-                  );
-                },
-                child: Text('Ver estadísticas'),
-              ),
             ],
           ),
         ),
