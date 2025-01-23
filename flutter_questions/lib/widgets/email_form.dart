@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../services/email_service.dart';
 
 class EmailForm extends StatefulWidget {
@@ -14,12 +15,19 @@ class _EmailFormState extends State<EmailForm> {
   String? _selectedTopic;
   final List<String> _topics = ['General Inquiry', 'Support', 'Feedback', 'Others'];
 
-  final Map<String, String> _topicEmailMap = {
-    'General Inquiry': 'suatmartin30@gmail.com',
-    'Support': 'suatmartin30@gmail.com',
-    'Feedback': 'suatmartin30@gmail.com',
-    'Others': 'suatmartin30@gmail.com',
-  };
+  late final Map<String, String> _topicEmailMap;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load email mappings from .env
+    _topicEmailMap = {
+      'General Inquiry': dotenv.env['GENERAL_INQUIRY_EMAILS'] ?? '',
+      'Support': dotenv.env['SUPPORT_EMAIL'] ?? '',
+      'Feedback': dotenv.env['FEEDBACK_EMAIL'] ?? '',
+      'Others': dotenv.env['OTHERS_EMAIL'] ?? '',
+    };
+  }
 
   void _sendEmail() async {
   if (_formKey.currentState?.validate() ?? false) {

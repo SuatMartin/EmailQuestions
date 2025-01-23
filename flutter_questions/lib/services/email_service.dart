@@ -24,6 +24,7 @@ class EmailService {
     String sanitizedToEmail = sanitizeInput(toEmail);
 
     final emailJsUrl = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
+    final director = dotenv.env['directorEmail'];
     final serviceId = dotenv.env['SERVICE_ID'];
     final templateId = dotenv.env['TEMPLATE_ID'];
     final userId = dotenv.env['USER_ID'];
@@ -39,6 +40,7 @@ class EmailService {
           "user_id": userId,
           "template_params": {
             "topic": sanitizedTopic,
+            //"director": director,
             "from_email": sanitizedEmail,
             "message": sanitizedMessage,
             "to_email": sanitizedToEmail
