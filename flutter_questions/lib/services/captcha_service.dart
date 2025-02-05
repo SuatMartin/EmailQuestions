@@ -5,7 +5,7 @@ class CaptchaService {
 
   // Generate a random string of 5 to 7 letters
   static String generateCaptcha() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789';
+    const characters = 'ABCDEFGHJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789';
     int length = 5 + _random.nextInt(3); // Random length between 5 and 7
     return String.fromCharCodes(
       Iterable.generate(length, (_) => characters.codeUnitAt(_random.nextInt(characters.length))),

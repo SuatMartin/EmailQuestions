@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class CaptchaDisplay extends StatelessWidget {
   final String captcha;
 
-  CaptchaDisplay({required this.captcha});
+  const CaptchaDisplay({super.key, required this.captcha});
 
   @override
   Widget build(BuildContext context) {

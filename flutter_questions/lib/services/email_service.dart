@@ -15,6 +15,8 @@ class EmailService {
     required String email,
     required String message,
     required String toEmail,
+    required String name,
+    required String question,
     required BuildContext context,
   }) async {
     // Sanitize inputs
@@ -22,6 +24,8 @@ class EmailService {
     String sanitizedEmail = sanitizeInput(email);
     String sanitizedMessage = sanitizeInput(message);
     String sanitizedToEmail = sanitizeInput(toEmail);
+    String sanitizedName = sanitizeInput(name);
+    String sanitizedQuestion = sanitizeInput(question);
 
     final emailJsUrl = Uri.parse('https://api.emailjs.com/api/v1.0/email/send');
     final director = dotenv.env['directorEmail'];
@@ -41,6 +45,8 @@ class EmailService {
           "template_params": {
             "topic": sanitizedTopic,
             //"director": director,
+            "name":sanitizedName,
+            "question":sanitizedQuestion,
             "from_email": sanitizedEmail,
             "message": sanitizedMessage,
             "to_email": sanitizedToEmail

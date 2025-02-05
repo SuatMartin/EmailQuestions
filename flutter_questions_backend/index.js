@@ -1,8 +1,10 @@
-require('dotenv').config(); // Load environment variables from a .env file
+require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const nodemailer = require('nodemailer');
+const schedule = require('node-schedule');
 
 const app = express();
 const port = 3000;
@@ -10,7 +12,7 @@ const port = 3000;
 app.use(bodyParser.json());
 app.use(cors());
 
-// MySQL connection setup using environment variables
+// MySQL connection setup
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -26,34 +28,55 @@ db.connect(err => {
   console.log('Connected to the MySQL database.');
 });
 
-// Route to increment email count
-app.post('/increment-email-count', async (req, res) => {
-  const { topic } = req.body;
+// Nodemailer transporter setup
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
 
-  // Validate input
-  if (!topic) {
-    return res.status(400).json({ error: 'Topic is required' });
-  }
-
+const sendEmailWithStats = async () => {
   try {
-    // Use the correct column names and table name
-    const [results] = await db.promise().query(
-      'UPDATE email_counts SET count = count + 1 WHERE topic = ?',
-      [topic]
-    );
+    // Fetch topics and counts from the database
+    const [rows] = await db.promise().query('SELECT topic, count FROM email_counts');
 
-    // Check if the topic was updated
-    if (results.affectedRows === 0) {
-      console.error(`Topic "${topic}" not found in the database.`);
-      return res.status(404).json({ error: `Topic "${topic}" not found` });
+    if (rows.length === 0) {
+      console.log('No data to send.');
+      return;
     }
 
-    console.log(`Count for topic "${topic}" incremented.`);
-    res.status(200).json({ message: `Count for topic "${topic}" incremented.` });
+    // Create email content
+    let emailContent = 'Here are the topics and their counts:\n\n';
+    rows.forEach(row => {
+      emailContent += `Topic: ${row.topic}, Count: ${row.count}\n`;
+    });
+
+    // Send the email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: 'suat.giray@estadisticas.pr', // Replace with the recipient's email
+      subject: 'Monthly Topics and Counts Report',
+      text: emailContent,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully!');
+
+    // Reset all counts to 0 after the email is sent
+    await db.promise().query('UPDATE email_counts SET count = 0');
+    console.log('Counts reset to 0.');
+
   } catch (error) {
-    console.error('Database error:', error);
-    res.status(500).json({ error: 'Database error occurred.' });
+    console.error('Error sending email:', error);
   }
+};
+
+// Schedule the email to be sent on the 1st of each month at 8:00 AM
+schedule.scheduleJob('0 8 1 * *', () => {
+  console.log('Running scheduled monthly email job...');
+  sendEmailWithStats();
 });
 
 // Start the server

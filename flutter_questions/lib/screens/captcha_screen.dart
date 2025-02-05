@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:developer';
 import 'package:flutter/material.dart';
-import '../widgets/captcha_display.dart';
-import '../services/captcha_service.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'email_web_screen.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class CaptchaScreen extends StatefulWidget {
   @override
@@ -9,67 +12,126 @@ class CaptchaScreen extends StatefulWidget {
 }
 
 class _CaptchaScreenState extends State<CaptchaScreen> {
-  late String _captcha;
-  final TextEditingController _controller = TextEditingController();
+  InAppWebViewController? _webViewController;
+  bool isCaptchaVerified = false;
+  Timer? _timer;
+
+  // Function to check CAPTCHA status from the Node.js server
+  Future<void> _checkCaptchaStatus() async {
+  try {
+    final uri = Uri.parse("http://localhost:8000/captcha-status");
+    final response = await http.get(uri);
+
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
+      if (result["success"] == true) {
+        setState(() {
+          isCaptchaVerified = true;
+        });
+        log("✅ CAPTCHA verified via API");
+
+        // Stop polling once verified
+        _timer?.cancel();
+      }
+    }
+  } catch (e) {
+    log("⚠️ Error checking CAPTCHA status: $e");
+  }
+}
+
+  // Function to start polling the CAPTCHA verification API
+  void _startCaptchaPolling() {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      _checkCaptchaStatus();
+    });
+  }
+
+  // Function to display the WebView with the reCAPTCHA
+  void _showRecaptchaWebView(BuildContext context) {
+  FocusScope.of(context).unfocus(); // Dismiss keyboard if open
+  showModalBottomSheet(
+    isDismissible: false,
+    backgroundColor: Colors.white,
+    isScrollControlled: true,
+    context: context,
+    builder: (BuildContext context) {
+      return SizedBox(
+        height: 700,
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  _timer?.cancel(); // Stop polling on close
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+            Expanded(
+              child: InAppWebView(
+                initialUrlRequest: URLRequest(
+                  url: WebUri("http://localhost:8000/recaptcha"), // Load from Node.js server
+                ),
+                initialSettings: InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                ),
+                onWebViewCreated: (controller) {
+                  _webViewController = controller;
+                  _startCaptchaPolling(); // Start checking if CAPTCHA passed
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 
   @override
-  void initState() {
-    super.initState();
-    _generateCaptcha();
-  }
-
-  void _generateCaptcha() {
-    _captcha = CaptchaService.generateCaptcha();
-    setState(() {});
-  }
-
-  void _validateCaptcha(BuildContext context) {
-    if (CaptchaService.validateCaptcha(_controller.text, _captcha)) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => EmailWebScreen()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('CAPTCHA incorrecto. Inténtelo de nuevo.')),
-      );
-      _controller.clear();
-      _generateCaptcha();
-    }
+  void dispose() {
+    _timer?.cancel(); // Cleanup when widget is disposed
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Verificación de CAPTCHA'),
+        title: Text('Verify CAPTCHA'),
         centerTitle: true,
+        backgroundColor: Colors.lightGreen[100],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      backgroundColor: Colors.lightGreen[100],
+      body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Por favor, ingrese el siguiente CAPTCHA para continuar:',
-              style: TextStyle(fontSize: 18.0),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 20),
-            CaptchaDisplay(captcha: _captcha),
-            SizedBox(height: 20),
-            TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Ingrese el CAPTCHA',
-              ),
-            ),
-            SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () => _validateCaptcha(context),
-              child: Text('Verificar'),
+              onPressed: () => _showRecaptchaWebView(context),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                textStyle: TextStyle(fontSize: 16),
+              ),
+              child: Text('Verify with reCAPTCHA'),
             ),
+            SizedBox(height: 20),
+            if (isCaptchaVerified)
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => EmailWebScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  backgroundColor: Colors.green,
+                ),
+                child: Text('Continue'),
+              ),
           ],
         ),
       ),

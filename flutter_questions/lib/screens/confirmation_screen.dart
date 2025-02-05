@@ -5,6 +5,8 @@ class ConfirmationScreen extends StatelessWidget {
   // URL to navigate
   final String _linkedinUrl = 'https://estadisticas.pr/';
 
+  const ConfirmationScreen({super.key});
+
   // Function to open the URL
   Future<void> _launchUrl() async {
     final Uri url = Uri.parse(_linkedinUrl);
@@ -19,7 +21,9 @@ class ConfirmationScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Confirmación'),
         centerTitle: true,
+        backgroundColor: Colors.lightGreen[100],
       ),
+      backgroundColor: Colors.lightGreen[100],
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
