@@ -7,7 +7,6 @@
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <script>
         function onRecaptchaSuccess(token) {
-            console.log("✅ reCAPTCHA token received:", token);
 
             // Notify the Node.js server that the CAPTCHA is verified
             fetch("http://localhost:8000/captcha-success", { method: "POST" })

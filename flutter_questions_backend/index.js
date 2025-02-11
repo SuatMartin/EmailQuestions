@@ -7,7 +7,7 @@ const nodemailer = require('nodemailer');
 const schedule = require('node-schedule');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT;
 
 app.use(bodyParser.json());
 app.use(cors());
@@ -37,10 +37,28 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+app.post(process.env.ENDPOINT_INCREMENT_COUNT, async (req, res) => {
+  try {
+    const { topic } = req.body;
+
+    if (!topic) {
+      return res.status(400).json({ error: 'Topic is required' });
+    }
+
+    // Use the query from the .env file
+    await db.promise().query(process.env.SQL_INCREMENT_COUNT, [topic]);
+
+    res.status(200).json({ message: 'Count incremented successfully' });
+  } catch (error) {
+    console.error('Error incrementing email count:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 const sendEmailWithStats = async () => {
   try {
     // Fetch topics and counts from the database
-    const [rows] = await db.promise().query('SELECT topic, count FROM email_counts');
+    const [rows] = await db.promise().query(process.env.SQL_SELECT_TOPICS);
 
     if (rows.length === 0) {
       console.log('No data to send.');
@@ -56,7 +74,7 @@ const sendEmailWithStats = async () => {
     // Send the email
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'suat.giray@estadisticas.pr', // Replace with the recipient's email
+      to: process.env.EMAIL_RECIPIENT,
       subject: 'Monthly Topics and Counts Report',
       text: emailContent,
     };
@@ -65,7 +83,7 @@ const sendEmailWithStats = async () => {
     console.log('Email sent successfully!');
 
     // Reset all counts to 0 after the email is sent
-    await db.promise().query('UPDATE email_counts SET count = 0');
+    await db.promise().query(process.env.SQL_RESET_COUNTS);
     console.log('Counts reset to 0.');
 
   } catch (error) {
@@ -74,7 +92,7 @@ const sendEmailWithStats = async () => {
 };
 
 // Schedule the email to be sent on the 1st of each month at 8:00 AM
-schedule.scheduleJob('0 8 1 * *', () => {
+schedule.scheduleJob(process.env.CRON_SCHEDULE, () => {
   console.log('Running scheduled monthly email job...');
   sendEmailWithStats();
 });

@@ -1,4 +1,4 @@
-import 'dart:math';
+/*import 'dart:math';
 
 class CaptchaService {
   static final Random _random = Random();
@@ -16,4 +16,4 @@ class CaptchaService {
   static bool validateCaptcha(String input, String captcha) {
     return input == captcha;
   }
-}
+}*/

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/captcha_screen.dart';
+import 'screens/email_web_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Flutter Web App',
-      home: CaptchaScreen(),
+      home: EmailWebScreen(),
     );
   }
 }

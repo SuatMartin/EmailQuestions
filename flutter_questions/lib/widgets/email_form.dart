@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:developer';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../services/email_service.dart';
+import 'package:http/http.dart' as http;
 
 class EmailForm extends StatefulWidget {
   const EmailForm({super.key});
@@ -35,11 +40,13 @@ class _EmailFormState extends State<EmailForm> {
   ];
 
   late final Map<String, String> _topicEmailMap;
+  bool isCaptchaVerified = false;
+  Timer? _timer;
+  InAppWebViewController? _webViewController;
 
   @override
   void initState() {
     super.initState();
-    // Load email mappings from .env
     _topicEmailMap = {
       'Demografía/Poblacion/Censo': dotenv.env['DEMOGRAFIA_EMAIL'] ?? '',
       'Economía': dotenv.env['ECONOMIA_EMAIL'] ?? '',
@@ -66,12 +73,11 @@ class _EmailFormState extends State<EmailForm> {
           topic: _selectedTopic!,
           email: _emailController.text,
           message: _messageController.text,
-          name: _nameController.text,  // Add name to email
-          question: _questionController.text,  // Add question to email
+          name: _nameController.text,
+          question: _questionController.text,
           toEmail: toEmail,
           context: context,
         );
-        // Show a success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Email sent successfully')),
         );
@@ -81,6 +87,84 @@ class _EmailFormState extends State<EmailForm> {
         );
       }
     }
+  }
+
+  // Function to check CAPTCHA status from the Node.js server
+  Future<void> _checkCaptchaStatus() async {
+    try {
+      final uri = Uri.parse("http://localhost:8000/captcha-status");
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (result["success"] == true) {
+          setState(() {
+            isCaptchaVerified = true;
+          });
+          log("✅ CAPTCHA verified via API");
+          _timer?.cancel();
+        }
+      }
+    } catch (e) {
+      log("⚠️ Error checking CAPTCHA status: $e");
+    }
+  }
+
+  // Function to start polling the CAPTCHA verification API
+  void _startCaptchaPolling() {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      _checkCaptchaStatus();
+    });
+  }
+
+  // Function to show the reCAPTCHA WebView
+  void _showRecaptchaWebView(BuildContext context) {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet(
+      isDismissible: false,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      context: context,
+      builder: (BuildContext context) {
+        return SizedBox(
+          height: 700,
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _timer?.cancel();
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
+              Expanded(
+                child: InAppWebView(
+                  initialUrlRequest: URLRequest(
+                    url: WebUri("http://localhost:8000/recaptcha"),
+                  ),
+                  initialSettings: InAppWebViewSettings(
+                    javaScriptEnabled: true,
+                  ),
+                  onWebViewCreated: (controller) {
+                    _webViewController = controller;
+                    _startCaptchaPolling();
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -98,12 +182,7 @@ class _EmailFormState extends State<EmailForm> {
                 _selectedTopic = newValue;
               });
             },
-            validator: (value) {
-              if (value == null) {
-                return 'Please select a topic';
-              }
-              return null;
-            },
+            validator: (value) => value == null ? 'Please select a topic' : null,
             items: _topics.map<DropdownMenuItem<String>>((String topic) {
               return DropdownMenuItem<String>(
                 value: topic,
@@ -115,52 +194,38 @@ class _EmailFormState extends State<EmailForm> {
           TextFormField(
             controller: _nameController,
             decoration: InputDecoration(labelText: 'Your Name'),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your name';
-              }
-              return null;
-            },
+            validator: (value) => value!.isEmpty ? 'Please enter your name' : null,
           ),
           SizedBox(height: 10),
           TextFormField(
             controller: _questionController,
             decoration: InputDecoration(labelText: 'Your Question'),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your question';
-              }
-              return null;
-            },
+            validator: (value) => value!.isEmpty ? 'Please enter your question' : null,
           ),
           SizedBox(height: 10),
           TextFormField(
             controller: _emailController,
             decoration: InputDecoration(labelText: 'Your Email'),
-            validator: (value) {
-              if (value == null || value.isEmpty || !value.contains('@')) {
-                return 'Please enter a valid email';
-              }
-              return null;
-            },
+            validator: (value) => value!.isEmpty || !value.contains('@') ? 'Please enter a valid email' : null,
           ),
           SizedBox(height: 10),
           TextFormField(
             controller: _messageController,
             decoration: InputDecoration(labelText: 'Message'),
             maxLines: 4,
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter a message';
-              }
-              return null;
-            },
+            validator: (value) => value!.isEmpty ? 'Please enter a message' : null,
           ),
           SizedBox(height: 20),
           ElevatedButton(
-            onPressed: _sendEmail,
-            child: Text('Send Email'),
+            onPressed: () => _showRecaptchaWebView(context),
+            child: Text('Verify with reCAPTCHA'),
           ),
+          SizedBox(height: 10),
+          if (isCaptchaVerified)
+            ElevatedButton(
+              onPressed: _sendEmail,
+              child: Text('Send Email'),
+            ),
         ],
       ),
     );

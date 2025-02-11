@@ -6,21 +6,34 @@
     <title>reCAPTCHA</title>
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <script>
-        function onRecaptchaSuccess(token) {
-            console.log("✅ reCAPTCHA token received:", token);
-
-            // Notify the Node.js server that the CAPTCHA is verified
-            fetch("http://localhost:8000/captcha-success", { method: "POST" })
-                .then(response => response.json())
-                .then(data => console.log("Server Updated:", data))
-                .catch(error => console.error("Error updating server:", error));
+        async function loadRecaptcha() {
+            const response = await fetch("http://localhost:8000/get-site-key");
+            const data = await response.json();
+            if (data.siteKey) {
+                document.getElementById("recaptcha-container").innerHTML = `
+                    <div class="g-recaptcha"
+                         data-sitekey="${data.siteKey}"
+                         data-callback="onRecaptchaSuccess">
+                    </div>`;
+            }
         }
+
+        function onRecaptchaSuccess(token) {
+
+            fetch("http://localhost:8000/verify-captcha", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token })
+            })
+            .then(response => response.json())
+            .then(data => console.log("Server Response:", data))
+            .catch(error => console.error("Error verifying CAPTCHA:", error));
+        }
+
+        window.onload = loadRecaptcha;
     </script>
 </head>
 <body>
-    <div class="g-recaptcha"
-         data-sitekey="6LcNj8sqAAAAAM3JJ-g5ricmsu2MMZ4F30puZe3V"
-         data-callback="onRecaptchaSuccess">
-    </div>
+    <div id="recaptcha-container"></div>
 </body>
 </html>
