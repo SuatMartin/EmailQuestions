@@ -20,22 +20,25 @@ class _EmailFormState extends State<EmailForm> {
   final _messageController = TextEditingController();
   final _nameController = TextEditingController();
   final _questionController = TextEditingController();
+  final statuspoint = dotenv.env['CAPTCHA_STATUS_ENDPOINT'] ?? "not loaded";
+  final recaptchapoint = dotenv.env['CAPTCHA_ENDPOINT'] ?? "not loaded";
 
   String? _selectedTopic;
   final List<String> _topics = [
-    'Demografía/Poblacion/Censo', 
-    'Economía', 
-    'Salud', 
-    'Geografía', 
-    'Telecomunicaciones/Transportación/Carreteras',
-    'Ambiental', 
-    'Educación', 
-    'Ciencia y Tecnología', 
-    'Familia/Servicios Sociales', 
-    'Justicia/Seguridad', 
-    'Otros', 
-    'Turismo', 
-    'Cultura', 
+    'Demografía, Población, Censo',
+    'Economía',
+    'Salud',
+    'Geografía',
+    'Telecomunicaciones, Transportación, Carreteras',
+    'Ambiental',
+    'Educación',
+    'Ciencia y Tecnología',
+    'Familia, Servicios Sociales',
+    'Justicia, Seguridad',
+    'Violencia',
+    'Violencia de genero',
+    'Turismo',
+    'Cultura',
     'Academias y Talleres'
   ];
 
@@ -44,21 +47,25 @@ class _EmailFormState extends State<EmailForm> {
   Timer? _timer;
   InAppWebViewController? _webViewController;
 
+  final _honeypotNameController = TextEditingController(); // Honeypot field
+  final _honeypotEmailController = TextEditingController(); // Honeypot field
+
   @override
   void initState() {
     super.initState();
     _topicEmailMap = {
-      'Demografía/Poblacion/Censo': dotenv.env['DEMOGRAFIA_EMAIL'] ?? '',
+      'Demografía, Población, Censo': dotenv.env['DEMOGRAFIA_EMAIL'] ?? '',
       'Economía': dotenv.env['ECONOMIA_EMAIL'] ?? '',
       'Salud': dotenv.env['SALUD_EMAIL'] ?? '',
       'Geografía': dotenv.env['GEOGRAFIA_EMAIL'] ?? '',
-      'Telecomunicaciones/Transportación/Carreteras': dotenv.env['TELECOMUNICACIONES_EMAIL'] ?? '',
+      'Telecomunicaciones, Transportación, Carreteras': dotenv.env['TELECOMUNICACIONES_EMAIL'] ?? '',
       'Ambiental': dotenv.env['AMBIENTAL_EMAIL'] ?? '',
       'Educación': dotenv.env['EDUCACION_EMAIL'] ?? '',
       'Ciencia y Tecnología': dotenv.env['CIENCIA_TECHNOLOGIA_EMAIL'] ?? '',
-      'Familia/Servicios Sociales': dotenv.env['FAMILIA_SERVICIOS_SOCIALES_EMAIL'] ?? '',
-      'Justicia/Seguridad': dotenv.env['JUSTICIA_SEGURIDAD_EMAIL'] ?? '',
-      'Otros': dotenv.env['OTROS_EMAIL'] ?? '',
+      'Familia, Servicios Sociales': dotenv.env['FAMILIA_SERVICIOS_SOCIALES_EMAIL'] ?? '',
+      'Justicia, Seguridad': dotenv.env['JUSTICIA_SEGURIDAD_EMAIL'] ?? '',
+      'Violencia': dotenv.env['VIOLENCIA_EMAIL'] ?? '',
+      'Violencia de genero': dotenv.env['VIOLENCIA_DE_GENERO_EMAIL'] ?? '',
       'Turismo': dotenv.env['TURISMO_EMAIL'] ?? '',
       'Cultura': dotenv.env['CULTURA_EMAIL'] ?? '',
       'Academias y Talleres': dotenv.env['ACADEMIAS_TALLERES_EMAIL'] ?? '',
@@ -66,6 +73,13 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   void _sendEmail() async {
+    if (_honeypotNameController.text.isNotEmpty || _honeypotEmailController.text.isNotEmpty) {
+      // If honeypot fields are filled, close the app
+      log("⚠️ Honeypot detected. Closing the app.");
+      Navigator.of(context).pop();
+      return;
+    }
+
     if (_formKey.currentState?.validate() ?? false) {
       if (_selectedTopic != null) {
         String toEmail = _topicEmailMap[_selectedTopic!]!;
@@ -79,45 +93,46 @@ class _EmailFormState extends State<EmailForm> {
           context: context,
         );
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Email sent successfully')),
+          SnackBar(content: Text('Correo enviado exitosamente')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select a topic')),
+          SnackBar(content: Text('Por favor seleccione un tema')),
         );
       }
     }
   }
 
-  // Function to check CAPTCHA status from the Node.js server
-  Future<void> _checkCaptchaStatus() async {
+  Future<bool> _checkCaptchaStatus() async {
     try {
-      final uri = Uri.parse("http://localhost:8000/captcha-status");
+      final uri = Uri.parse(statuspoint);
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         if (result["success"] == true) {
-          setState(() {
-            isCaptchaVerified = true;
-          });
-          log("✅ CAPTCHA verified via API");
-          _timer?.cancel();
+          log("✅ CAPTCHA verificado via API");
+          return true;
         }
       }
     } catch (e) {
-      log("⚠️ Error checking CAPTCHA status: $e");
+      log("⚠️ Error verificando el estado del CAPTCHA: $e");
     }
+    return false;
   }
 
-  // Function to start polling the CAPTCHA verification API
   void _startCaptchaPolling() {
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      _checkCaptchaStatus();
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) async {
+      bool verified = await _checkCaptchaStatus();
+      if (verified) {
+        setState(() {
+          isCaptchaVerified = true;
+        });
+        _timer?.cancel();
+      }
     });
   }
 
-  // Function to show the reCAPTCHA WebView
   void _showRecaptchaWebView(BuildContext context) {
     FocusScope.of(context).unfocus();
     showModalBottomSheet(
@@ -143,7 +158,7 @@ class _EmailFormState extends State<EmailForm> {
               Expanded(
                 child: InAppWebView(
                   initialUrlRequest: URLRequest(
-                    url: WebUri("http://localhost:8000/recaptcha"),
+                    url: WebUri(recaptchapoint),
                   ),
                   initialSettings: InAppWebViewSettings(
                     javaScriptEnabled: true,
@@ -169,64 +184,115 @@ class _EmailFormState extends State<EmailForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Form(
-      key: _formKey,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          DropdownButtonFormField<String>(
-            value: _selectedTopic,
-            hint: Text('Select Topic'),
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedTopic = newValue;
-              });
-            },
-            validator: (value) => value == null ? 'Please select a topic' : null,
-            items: _topics.map<DropdownMenuItem<String>>((String topic) {
-              return DropdownMenuItem<String>(
-                value: topic,
-                child: Text(topic),
-              );
-            }).toList(),
-          ),
-          SizedBox(height: 10),
-          TextFormField(
-            controller: _nameController,
-            decoration: InputDecoration(labelText: 'Your Name'),
-            validator: (value) => value!.isEmpty ? 'Please enter your name' : null,
-          ),
-          SizedBox(height: 10),
-          TextFormField(
-            controller: _questionController,
-            decoration: InputDecoration(labelText: 'Your Question'),
-            validator: (value) => value!.isEmpty ? 'Please enter your question' : null,
-          ),
-          SizedBox(height: 10),
-          TextFormField(
-            controller: _emailController,
-            decoration: InputDecoration(labelText: 'Your Email'),
-            validator: (value) => value!.isEmpty || !value.contains('@') ? 'Please enter a valid email' : null,
-          ),
-          SizedBox(height: 10),
-          TextFormField(
-            controller: _messageController,
-            decoration: InputDecoration(labelText: 'Message'),
-            maxLines: 4,
-            validator: (value) => value!.isEmpty ? 'Please enter a message' : null,
-          ),
-          SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () => _showRecaptchaWebView(context),
-            child: Text('Verify with reCAPTCHA'),
-          ),
-          SizedBox(height: 10),
-          if (isCaptchaVerified)
-            ElevatedButton(
-              onPressed: _sendEmail,
-              child: Text('Send Email'),
+    // Get screen width and height
+    double screenWidth = MediaQuery.of(context).size.width;
+    double screenHeight = MediaQuery.of(context).size.height;
+
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: screenWidth),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: _selectedTopic,
+                    decoration: InputDecoration(
+                      labelText: 'Seleccione un tema',
+                      labelStyle: TextStyle(color: const Color.fromARGB(255, 13, 13, 13)),
+                    ),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedTopic = newValue;
+                      });
+                    },
+                    validator: (value) => value == null ? 'Seleccione un tema' : null,
+                    items: _topics.map<DropdownMenuItem<String>>((String topic) {
+                      return DropdownMenuItem<String>(
+                        value: topic,
+                        child: Text(topic),
+                      );
+                    }).toList(),
+                  ),
+                  SizedBox(height: 16),
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre y Apellido (Ingrese su nombre)',
+                      labelStyle: TextStyle(color: const Color.fromARGB(255, 13, 13, 13)),
+                    ),
+                    validator: (value) => value == null || value.isEmpty ? 'Ingrese su nombre' : null,
+                  ),
+                  SizedBox(height: 16),
+                  TextFormField(
+                    controller: _emailController,
+                    decoration: InputDecoration(
+                      labelText: 'Su Correo Electrónico (Ingrese un correo válido)',
+                      labelStyle: TextStyle(color: const Color.fromARGB(255, 13, 13, 13)),
+                    ),
+                    validator: (value) => value == null || value.isEmpty ? 'Ingrese un correo válido' : null,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  SizedBox(height: 16),
+                  TextFormField(
+                    controller: _questionController,
+                    decoration: InputDecoration(
+                      labelText: 'Tópico (Ingrese el tópico de su pregunta)',
+                      labelStyle: TextStyle(color: const Color.fromARGB(255, 13, 13, 13)),
+                    ),
+                    validator: (value) => value == null || value.isEmpty ? 'Ingrese el tópico de su pregunta' : null,
+                  ),
+                  SizedBox(height: 16),
+                  TextFormField(
+                    controller: _messageController,
+                    decoration: InputDecoration(
+                      labelText: 'Escriba su pregunta aquí (Incluya el mayor detalle posible)',
+                      labelStyle: TextStyle(color: const Color.fromARGB(255, 13, 13, 13)),
+                    ),
+                    maxLines: 4,
+                    validator: (value) => value == null || value.isEmpty ? 'Ingrese su pregunta detallada' : null,
+                  ),
+                  // Honeypot fields (hidden from the user)
+                  Visibility(
+                    visible: false,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _honeypotNameController,
+                          decoration: InputDecoration(labelText: 'Honeypot: Nombre'),
+                        ),
+                        TextFormField(
+                          controller: _honeypotEmailController,
+                          decoration: InputDecoration(labelText: 'Honeypot: Email'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  Center(
+                    child: Column(
+                      children: [
+                        ElevatedButton(
+                          onPressed: () => _showRecaptchaWebView(context),
+                          child: Text('Verificar con reCAPTCHA'),
+                        ),
+                        SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: isCaptchaVerified ? _sendEmail : null,
+                          child: Text('Enviar Correo'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-        ],
+          ),
+        ),
       ),
     );
   }

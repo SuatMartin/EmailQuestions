@@ -21,9 +21,9 @@ class ConfirmationScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('Confirmación'),
         centerTitle: true,
-        backgroundColor: Colors.lightGreen[100],
+        backgroundColor: Colors.green[800], // Dark green app bar
       ),
-      backgroundColor: Colors.lightGreen[100],
+      backgroundColor: Colors.lightGreen[100], // Light green background
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),

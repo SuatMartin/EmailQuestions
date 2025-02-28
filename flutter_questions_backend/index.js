@@ -3,14 +3,32 @@ const express = require('express');
 const mysql = require('mysql2');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const rateLimit = require("express-rate-limit");
+const axios = require("axios");
 const nodemailer = require('nodemailer');
 const schedule = require('node-schedule');
 
 const app = express();
 const port = process.env.PORT;
-
 app.use(bodyParser.json());
+app.use(express.json());
 app.use(cors());
+
+// Rate limiter: Allow only 3 requests per 10 minutes per IP
+const emailRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 3, // Limit each IP to 3 requests per windowMs
+  message: { error: "Too many requests, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
+// Middleware to log requests
+app.use((req, res, next) => {
+  console.log(`Request from IP: ${req.ip}`);
+  next();
+});
 
 // MySQL connection setup
 const db = mysql.createConnection({
@@ -35,6 +53,75 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASSWORD,
   },
+});
+
+async function sendEmail(serviceId, templateId, userId, templateParams) {
+  return axios.post("https://api.emailjs.com/api/v1.0/email/send", {
+    service_id: serviceId,
+    template_id: templateId,
+    user_id: userId,
+    template_params: templateParams,
+  });
+}
+
+
+app.post("/send-email", emailRateLimiter, async (req, res) => {
+  try {
+    const { topic, email, message, toEmail, name, question, director } = req.body;
+    
+
+    const directorEmail = process.env.DIRECTOR_EMAIL;
+    const serviceId = process.env.SERVICE_ID;
+    const templateId = process.env.TEMPLATE_ID;
+    const templateIdToDirector = process.env.TEMPLATE_ID2;
+    const userId = process.env.USER_ID;
+
+    // Send first email (to the recipient)
+    const emailResponse = await sendEmail(serviceId, templateId, userId, {
+      topic,
+      name,
+      question,
+      from_email: email,
+      message,
+      to_email: toEmail,
+    });
+
+    if (emailResponse.status === 200) {
+      console.log("First email sent successfully");
+
+      // Send second email (to the director)
+      const directorEmailResponse = await sendEmail(serviceId, templateIdToDirector, userId, {
+        topic,
+        director: directorEmail,
+        message,
+        to_email: directorEmail,
+      });
+
+      if (directorEmailResponse.status === 200) {
+        console.log("Second email (to director) sent successfully");
+
+        // Increment the topic count
+        const countUpdateResponse = await axios.post("http://localhost:3000/increment-email-count", { topic });
+
+        if (countUpdateResponse.status === 200) {
+          console.log("Topic count updated successfully");
+          return res.json({ success: "Emails sent and topic count updated" });
+        } else {
+          console.error("Failed to update topic count:", countUpdateResponse.data);
+          return res.status(500).json({ error: "Failed to update topic count" });
+        }
+      } else {
+        console.error("Failed to send director email:", directorEmailResponse.data);
+        return res.status(500).json({ error: "Failed to send email to the director" });
+      }
+    } else {
+      console.error("Failed to send first email:", emailResponse.data);
+      return res.status(500).json({ error: "Failed to send the first email" });
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 app.post(process.env.ENDPOINT_INCREMENT_COUNT, async (req, res) => {

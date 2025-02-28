@@ -8,14 +8,25 @@ class EmailWebScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Escriba su pregunta y escoja el topico al que pertenece abajo'),
+        title: Text('Escriba su pregunta y escoja el tema'),
         centerTitle: true,
-        backgroundColor: Colors.lightGreen[100],
+        backgroundColor: Colors.green[800], // Dark green app bar
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Image.asset(
+              '../../assets/IEPR.png',
+              height: 80,
+            ),
+          ),
+        ],
       ),
-      backgroundColor: Colors.lightGreen[100],
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: EmailForm(),
+      body: Container(
+        color: const Color.fromARGB(255, 9, 58, 114), // Solid blue background for the body
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: EmailForm(),
+        ),
       ),
     );
   }
