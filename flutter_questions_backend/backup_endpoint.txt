@@ -1,0 +1,44 @@
+app.post("/send-email", emailRateLimiter, async (req, res) => {
+  try {
+    const { topic, email, message, toEmail, name, question } = req.body;
+    const directorEmail = process.env.DIRECTOR_EMAIL;
+
+    // Email options for the recipient
+    const recipientMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: toEmail,
+      subject: `New Inquiry: ${topic}`,
+      text: `Hello,\n\nYou have received a new inquiry.\n\nTopic: ${topic}\nName: ${name}\nQuestion: ${question}\nMessage: ${message}\nFrom: ${email}\n\nBest regards,`,
+    };
+
+    // Send first email (to the recipient)
+    await transporter.sendMail(recipientMailOptions);
+    console.log("First email sent successfully");
+
+    // Email options for the director
+    const directorMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: directorEmail,
+      subject: `New Inquiry Received - ${topic}`,
+      text: `Hello Director,\n\nA new inquiry has been received.\n\nTopic: ${topic}\nMessage: ${message}\n\nBest regards,`,
+    };
+
+    // Send second email (to the director)
+    await transporter.sendMail(directorMailOptions);
+    console.log("Second email (to director) sent successfully");
+
+    // Increment the topic count
+    const countUpdateResponse = await axios.post("http://localhost:3000/increment-email-count", { topic });
+
+    if (countUpdateResponse.status === 200) {
+      console.log("Topic count updated successfully");
+      return res.json({ success: "Emails sent and topic count updated" });
+    } else {
+      console.error("Failed to update topic count:", countUpdateResponse.data);
+      return res.status(500).json({ error: "Failed to update topic count" });
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});

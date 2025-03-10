@@ -65,58 +65,44 @@ async function sendEmail(serviceId, templateId, userId, templateParams) {
 }
 
 
-app.post("/send-email", emailRateLimiter, async (req, res) => {
+app.post(process.env.ENDPOINT_SEND_MAI, emailRateLimiter, async (req, res) => {
   try {
-    const { topic, email, message, toEmail, name, question, director } = req.body;
-    
-
+    const { topic, email, message, toEmail, name, question } = req.body;
     const directorEmail = process.env.DIRECTOR_EMAIL;
-    const serviceId = process.env.SERVICE_ID;
-    const templateId = process.env.TEMPLATE_ID;
-    const templateIdToDirector = process.env.TEMPLATE_ID2;
-    const userId = process.env.USER_ID;
+
+    // Email options for the recipient
+    const recipientMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: toEmail,
+      subject: `Nueva Pregunta: ${topic}`,
+      text: `Saludos,\n\nHa recibido una pregunta nueva.\n\nTema: ${topic}\nNombre de la persona que pregunto: ${name}\nAsunto: ${question}\nPregunta Detallada: ${message}\nDesde: ${email}\n\nMejores Deseos,`,
+    };
 
     // Send first email (to the recipient)
-    const emailResponse = await sendEmail(serviceId, templateId, userId, {
-      topic,
-      name,
-      question,
-      from_email: email,
-      message,
-      to_email: toEmail,
-    });
+    await transporter.sendMail(recipientMailOptions);
+    console.log("First email sent successfully");
 
-    if (emailResponse.status === 200) {
-      console.log("First email sent successfully");
+    // Email options for the director
+    const directorMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: directorEmail,
+      subject: `Se ha enviado una nueva pregunta - ${topic}`,
+      text: `Saludos Director,\n\nSe ha enviado una nueva pregunta.\n\nTema: ${topic}\nPregunta Detallada: ${message}\n\nMejores Deseos,`,
+    };
 
-      // Send second email (to the director)
-      const directorEmailResponse = await sendEmail(serviceId, templateIdToDirector, userId, {
-        topic,
-        director: directorEmail,
-        message,
-        to_email: directorEmail,
-      });
+    // Send second email (to the director)
+    await transporter.sendMail(directorMailOptions);
+    console.log("Second email (to director) sent successfully");
 
-      if (directorEmailResponse.status === 200) {
-        console.log("Second email (to director) sent successfully");
+    // Increment the topic count
+    const countUpdateResponse = await axios.post("http://localhost:3000/increment-email-count", { topic });
 
-        // Increment the topic count
-        const countUpdateResponse = await axios.post("http://localhost:3000/increment-email-count", { topic });
-
-        if (countUpdateResponse.status === 200) {
-          console.log("Topic count updated successfully");
-          return res.json({ success: "Emails sent and topic count updated" });
-        } else {
-          console.error("Failed to update topic count:", countUpdateResponse.data);
-          return res.status(500).json({ error: "Failed to update topic count" });
-        }
-      } else {
-        console.error("Failed to send director email:", directorEmailResponse.data);
-        return res.status(500).json({ error: "Failed to send email to the director" });
-      }
+    if (countUpdateResponse.status === 200) {
+      console.log("Topic count updated successfully");
+      return res.json({ success: "Emails sent and topic count updated" });
     } else {
-      console.error("Failed to send first email:", emailResponse.data);
-      return res.status(500).json({ error: "Failed to send the first email" });
+      console.error("Failed to update topic count:", countUpdateResponse.data);
+      return res.status(500).json({ error: "Failed to update topic count" });
     }
   } catch (error) {
     console.error("Error:", error);
