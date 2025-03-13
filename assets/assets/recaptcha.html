@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>reCAPTCHA</title>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script>
+        async function loadRecaptcha() {
+            const response = await fetch("http://localhost:8000/get-site-key");
+            const data = await response.json();
+            if (data.siteKey) {
+                document.getElementById("recaptcha-container").innerHTML = `
+                    <div class="g-recaptcha"
+                         data-sitekey="${data.siteKey}"
+                         data-callback="onRecaptchaSuccess">
+                    </div>`;
+            }
+        }
+
+        function onRecaptchaSuccess(token) {
+
+            fetch("http://localhost:8000/verify-captcha", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token })
+            })
+            .then(response => response.json())
+            .then(data => console.log("Server Response:", data))
+            .catch(error => console.error("Error verifying CAPTCHA:", error));
+        }
+
+        window.onload = loadRecaptcha;
+    </script>
+</head>
+<body>
+    <div id="recaptcha-container"></div>
+</body>
+</html>
