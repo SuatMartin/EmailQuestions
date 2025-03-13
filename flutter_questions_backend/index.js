@@ -65,7 +65,7 @@ async function sendEmail(serviceId, templateId, userId, templateParams) {
 }
 
 
-app.post(process.env.ENDPOINT_SEND_MAI, emailRateLimiter, async (req, res) => {
+app.post(process.env.ENDPOINT_SEND_MAIL, emailRateLimiter, async (req, res) => {
   try {
     const { topic, email, message, toEmail, name, question } = req.body;
     const directorEmail = process.env.DIRECTOR_EMAIL;

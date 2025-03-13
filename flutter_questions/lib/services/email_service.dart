@@ -10,8 +10,8 @@ class EmailService {
     return parse(input).documentElement?.text ?? '';
   }
 
-  static final String endpoint = dotenv.env['EMAIL_ENDPOINT'] ?? "not loaded";
-  static final String countEndpoint = dotenv.env['COUNT_INCREMENT_ENDPOINT'] ?? "not loaded";
+  static final String endpoint = "http://localhost:3000/send-email";
+  static final String countEndpoint = "http://localhost:3000/increment-email-count";
 
   /// Send email request
   static Future<void> sendEmail({

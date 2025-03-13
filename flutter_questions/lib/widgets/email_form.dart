@@ -20,8 +20,8 @@ class _EmailFormState extends State<EmailForm> {
   final _messageController = TextEditingController();
   final _nameController = TextEditingController();
   final _questionController = TextEditingController();
-  final statuspoint = dotenv.env['CAPTCHA_STATUS_ENDPOINT'] ?? "not loaded";
-  final recaptchapoint = dotenv.env['CAPTCHA_ENDPOINT'] ?? "not loaded";
+  final statuspoint = "http://localhost:8000/captcha-status";
+  final recaptchapoint = "http://localhost:8000/recaptcha";
 
   String? _selectedTopic;
   final List<String> _topics = [
@@ -54,28 +54,26 @@ class _EmailFormState extends State<EmailForm> {
   void initState() {
     super.initState();
     _topicEmailMap = {
-      'Demografía, Población, Censo': dotenv.env['DEMOGRAFIA_EMAIL'] ?? '',
-      'Economía': dotenv.env['ECONOMIA_EMAIL'] ?? '',
-      'Salud': dotenv.env['SALUD_EMAIL'] ?? '',
-      'Geografía': dotenv.env['GEOGRAFIA_EMAIL'] ?? '',
-      'Telecomunicaciones, Transportación, Carreteras': dotenv.env['TELECOMUNICACIONES_EMAIL'] ?? '',
-      'Ambiental': dotenv.env['AMBIENTAL_EMAIL'] ?? '',
-      'Educación': dotenv.env['EDUCACION_EMAIL'] ?? '',
-      'Ciencia y Tecnología': dotenv.env['CIENCIA_TECHNOLOGIA_EMAIL'] ?? '',
-      'Familia, Servicios Sociales': dotenv.env['FAMILIA_SERVICIOS_SOCIALES_EMAIL'] ?? '',
-      'Justicia, Seguridad': dotenv.env['JUSTICIA_SEGURIDAD_EMAIL'] ?? '',
-      'Violencia': dotenv.env['VIOLENCIA_EMAIL'] ?? '',
-      'Violencia de genero': dotenv.env['VIOLENCIA_DE_GENERO_EMAIL'] ?? '',
-      'Turismo': dotenv.env['TURISMO_EMAIL'] ?? '',
-      'Cultura': dotenv.env['CULTURA_EMAIL'] ?? '',
-      'Academias y Talleres': dotenv.env['ACADEMIAS_TALLERES_EMAIL'] ?? '',
+      'Demografía, Población, Censo': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Economía': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Salud': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Geografía': 'suat.giray@estadisticas.pr',
+      'Telecomunicaciones, Transportación, Carreteras': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Ambiental': 'suat.giray@estadisticas.pr',
+      'Educación': 'suat.giray@estadisticas.pr',
+      'Ciencia y Tecnología':'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Familia, Servicios Sociales': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Justicia, Seguridad': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Violencia': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Violencia de genero': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Turismo': 'suat.giray@estadisticas.pr,marcos.santana@estadisticas.pr',
+      'Cultura': 'suat.giray@estadisticas.pr',
+      'Academias y Talleres': 'suat.giray@estadisticas.pr',
     };
   }
 
   void _sendEmail() async {
     if (_honeypotNameController.text.isNotEmpty || _honeypotEmailController.text.isNotEmpty) {
-      // If honeypot fields are filled, close the app
-      log("⚠️ Honeypot detected. Closing the app.");
       Navigator.of(context).pop();
       return;
     }
