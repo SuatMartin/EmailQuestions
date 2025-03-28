@@ -10,8 +10,8 @@ class EmailService {
     return parse(input).documentElement?.text ?? '';
   }
 
-  static final String endpoint = "http://localhost:3000/send-email";
-  static final String countEndpoint = "http://localhost:3000/increment-email-count";
+  static final String endpoint = "http://localhost:8000/send-email";
+  static final String countEndpoint = "http://localhost:8000/increment-email-count";
 
   /// Send email request
   static Future<void> sendEmail({

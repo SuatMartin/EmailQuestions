@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:developer';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'dart:js' as js;
 import '../services/email_service.dart';
 import 'package:http/http.dart' as http;
+
 
 class EmailForm extends StatefulWidget {
   const EmailForm({super.key});
@@ -20,8 +20,7 @@ class _EmailFormState extends State<EmailForm> {
   final _messageController = TextEditingController();
   final _nameController = TextEditingController();
   final _questionController = TextEditingController();
-  final statuspoint = "http://localhost:8000/captcha-status";
-  final recaptchapoint = "http://localhost:8000/recaptcha";
+  String? recaptchaToken;
 
   String? _selectedTopic;
   final List<String> _topics = [
@@ -45,7 +44,6 @@ class _EmailFormState extends State<EmailForm> {
   late final Map<String, String> _topicEmailMap;
   bool isCaptchaVerified = false;
   Timer? _timer;
-  InAppWebViewController? _webViewController;
 
   final _honeypotNameController = TextEditingController(); // Honeypot field
   final _honeypotEmailController = TextEditingController(); // Honeypot field
@@ -73,106 +71,73 @@ class _EmailFormState extends State<EmailForm> {
   }
 
   void _sendEmail() async {
-    if (_honeypotNameController.text.isNotEmpty || _honeypotEmailController.text.isNotEmpty) {
-      Navigator.of(context).pop();
-      return;
-    }
-
-    if (_formKey.currentState?.validate() ?? false) {
-      if (_selectedTopic != null) {
-        String toEmail = _topicEmailMap[_selectedTopic!]!;
-        EmailService.sendEmail(
-          topic: _selectedTopic!,
-          email: _emailController.text,
-          message: _messageController.text,
-          name: _nameController.text,
-          question: _questionController.text,
-          toEmail: toEmail,
-          context: context,
-        );
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Correo enviado exitosamente')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Por favor seleccione un tema')),
-        );
-      }
-    }
+  if (_honeypotNameController.text.isNotEmpty || _honeypotEmailController.text.isNotEmpty) {
+    Navigator.of(context).pop();
+    return;
   }
 
-  Future<bool> _checkCaptchaStatus() async {
-    try {
-      final uri = Uri.parse(statuspoint);
-      final response = await http.get(uri);
-
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-        if (result["success"] == true) {
-          log("✅ CAPTCHA verificado via API");
-          return true;
-        }
+  if (_formKey.currentState?.validate() ?? false) {
+    if (_selectedTopic != null) {
+      if (recaptchaToken == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Por favor, complete el reCAPTCHA')),
+        );
+        return;
       }
-    } catch (e) {
-      log("⚠️ Error verificando el estado del CAPTCHA: $e");
-    }
-    return false;
-  }
 
-  void _startCaptchaPolling() {
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) async {
-      bool verified = await _checkCaptchaStatus();
-      if (verified) {
+      String toEmail = _topicEmailMap[_selectedTopic!]!;
+      EmailService.sendEmail(
+        topic: _selectedTopic!,
+        email: _emailController.text,
+        message: _messageController.text,
+        name: _nameController.text,
+        question: _questionController.text,
+        toEmail: toEmail,
+        context: context,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Correo enviado exitosamente')),
+      );
+
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Por favor seleccione un tema')),
+      );
+    }
+  }
+}
+
+  void _showRecaptcha() async {
+  try {
+    final jsToken = js.context.callMethod('getRecaptchaToken', ['submit']);
+    if (jsToken is Future) {
+      final token = await jsToken; // Wait for reCAPTCHA token
+      if (token is String) {
         setState(() {
-          isCaptchaVerified = true;
+          recaptchaToken = token;
+          isCaptchaVerified = true; // Enable submit button
         });
-        _timer?.cancel();
       }
-    });
+    }
+  } catch (e) {
+    print("Error in reCAPTCHA: $e");
   }
+}
 
-  void _showRecaptchaWebView(BuildContext context) {
-    FocusScope.of(context).unfocus();
-    showModalBottomSheet(
-      isDismissible: false,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      context: context,
-      builder: (BuildContext context) {
-        return SizedBox(
-          height: 700,
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () {
-                    _timer?.cancel();
-                    Navigator.pop(context);
-                  },
-                ),
-              ),
-              Expanded(
-                child: InAppWebView(
-                  initialUrlRequest: URLRequest(
-                    url: WebUri(recaptchapoint),
-                  ),
-                  initialSettings: InAppWebViewSettings(
-                    javaScriptEnabled: true,
-                  ),
-                  onWebViewCreated: (controller) {
-                    _webViewController = controller;
-                    _startCaptchaPolling();
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+void _verifyCaptcha() {
+  String? token = js.context.callMethod('getCaptchaResponse');
+  if (token != null && token.isNotEmpty) {
+    setState(() {
+      recaptchaToken = token;
+      isCaptchaVerified = true; // Enable submit button
+    });
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Por favor complete el reCAPTCHA')),
     );
   }
+}
 
   @override
   void dispose() {
@@ -275,8 +240,8 @@ class _EmailFormState extends State<EmailForm> {
                     child: Column(
                       children: [
                         ElevatedButton(
-                          onPressed: () => _showRecaptchaWebView(context),
-                          child: Text('Verificar con reCAPTCHA'),
+                          onPressed: _verifyCaptcha,
+                          child: Text('Verificar reCAPTCHA'),
                         ),
                         SizedBox(height: 16),
                         ElevatedButton(
